@@ -1,43 +1,31 @@
 <?php
-
 /**
  * Copyright (C) 2008-2012 FluxBB
  * based on code by Rickard Andersson copyright (C) 2002-2008 PunBB
  * License: http://www.gnu.org/licenses/gpl.html GPL version 2 or higher
  */
-
 define('WITT_ENABLE', 300);
 define('PUN_ROOT', dirname(__FILE__).'/');
 require PUN_ROOT.'include/common.php';
-
-
 if ($pun_user['g_read_board'] == '0')
 	message($lang_common['No view'], false, '403 Forbidden');
-
-
 $action = $_GET['action'] ?? null;
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $pid = isset($_GET['pid']) ? intval($_GET['pid']) : 0;
 if ($id < 1 && $pid < 1)
 	message($lang_common['Bad request'], false, '404 Not Found');
-
 // Load the viewtopic.php language file
 require PUN_ROOT.'lang/'.$pun_user['language'].'/topic.php';
-
-
 // If a post ID is specified we determine topic ID and page number so we can redirect to the correct message
 if ($pid)
 {
 	$result = $db->query('SELECT topic_id FROM '.$db->prefix.'posts WHERE id='.$pid) or error('Unable to fetch topic ID', __FILE__, __LINE__, $db->error());
 	$id = $db->result($result);
-
 	if (!$id)
 		message($lang_common['Bad request'], false, '404 Not Found');
-
 	// Determine on which page the post is located (depending on $forum_user['disp_posts'])
 	$result = $db->query('SELECT COUNT(id) FROM '.$db->prefix.'posts WHERE topic_id='.$id.' AND id<'.$pid) or error('Unable to count previous posts', __FILE__, __LINE__, $db->error());
 	$num_posts = $db->result($result) + 1;
-
 	$_GET['p'] = ceil($num_posts / $pun_user['disp_posts']);
 }
 else
@@ -50,27 +38,22 @@ else
 			// We need to check if this topic has been viewed recently by the user
 			$tracked_topics = get_tracked_topics();
 			$last_viewed = isset($tracked_topics['topics'][$id]) ? $tracked_topics['topics'][$id] : $pun_user['last_visit'];
-
 			$result = $db->query('SELECT MIN(id) FROM '.$db->prefix.'posts WHERE topic_id='.$id.' AND posted>'.$last_viewed) or error('Unable to fetch first new post info', __FILE__, __LINE__, $db->error());
 			$first_new_post_id = $db->result($result);
-
 			if ($first_new_post_id)
 			{
 				header('Location: viewtopic.php?pid='.$first_new_post_id.'#p'.$first_new_post_id);
 				exit;
 			}
 		}
-
 		// If there is no new post, we go to the last post
 		$action = 'last';
 	}
-
 	// If action=last, we redirect to the last post
 	if ($action === 'last')
 	{
 		$result = $db->query('SELECT MAX(id) FROM '.$db->prefix.'posts WHERE topic_id='.$id) or error('Unable to fetch last post info', __FILE__, __LINE__, $db->error());
 		$last_post_id = $db->result($result);
-
 		if ($last_post_id)
 		{
 			header('Location: viewtopic.php?pid='.$last_post_id.'#p'.$last_post_id);
@@ -78,17 +61,13 @@ else
 		}
 	}
 }
-
 require PUN_ROOT.'include/user_agent.php'; // MOD user agent - Visman
 require PUN_ROOT.'include/poll.php';
-
 if (!is_null(poll_post('poll_submit')))
 {
 	poll_vote($id, $pun_user['id']);
-
 	redirect('viewtopic.php?id='.$id.((isset($_GET['p']) && $_GET['p'] > 1) ? '&p='.intval($_GET['p']) : ''), $lang_poll['M0']);
 }
-
 // search HL - Visman
 $url_shl = '';
 if (isset($_GET['search_hl']))
@@ -96,9 +75,7 @@ if (isset($_GET['search_hl']))
 	$search_hl = intval($_GET['search_hl']);
 	if ($search_hl < 1)
 		message($lang_common['Bad request'], false, '404 Not Found');
-
 	$ident = $pun_user['is_guest'] ? get_remote_address() : $pun_user['username'];
-
 	$result = $db->query('SELECT search_data FROM '.$db->prefix.'search_cache WHERE id='.$search_hl.' AND ident=\''.$db->escape($ident).'\'') or error('Unable to fetch search results', __FILE__, __LINE__, $db->error());
 	if ($row = $db->fetch_assoc($result))
 	{
@@ -106,10 +83,8 @@ if (isset($_GET['search_hl']))
 		if (isset($temp['array_shl']))
 		{
 			$string_shl = implode('|', $temp['array_shl']);
-
 			$url_shl = '&amp;search_hl='.$search_hl;
 		}
-
 		unset($temp);
 	}
 	else // запрос устарел или от другого юзера
@@ -117,38 +92,30 @@ if (isset($_GET['search_hl']))
 		if ($id > 0)
 		{
 			$p = isset($_GET['p']) && $_GET['p'] > 1 ? '&p='.intval($_GET['p']) : '';
-
 			header('Location: viewtopic.php?id='.$id.$p.($pid > 0 ? '#p'.$pid : ''), true, 301);
 		}
 		else
 			header('Location: viewtopic.php?pid='.$pid.'#p'.$pid, true, 301);
-
 		exit;
 	}
 }
 // search HL - Visman
-
 // StickFP - ADD t.stick_fp, - ADD t.poll_type, t.poll_time, t.poll_term, t.poll_kol, - Visman
 // Fetch some info about the topic
 if (!$pun_user['is_guest'])
 	$result = $db->query('SELECT t.stick_fp, t.subject, t.closed, t.num_replies, t.sticky, t.first_post_id, t.poll_type, t.poll_time, t.poll_term, t.poll_kol, f.id AS forum_id, f.forum_name, f.moderators, fp.post_replies, s.user_id AS is_subscribed FROM '.$db->prefix.'topics AS t INNER JOIN '.$db->prefix.'forums AS f ON f.id=t.forum_id LEFT JOIN '.$db->prefix.'topic_subscriptions AS s ON (t.id=s.topic_id AND s.user_id='.$pun_user['id'].') LEFT JOIN '.$db->prefix.'forum_perms AS fp ON (fp.forum_id=f.id AND fp.group_id='.$pun_user['g_id'].') WHERE (fp.read_forum IS NULL OR fp.read_forum=1) AND t.id='.$id.' AND t.moved_to IS NULL') or error('Unable to fetch topic info', __FILE__, __LINE__, $db->error());
 else
 	$result = $db->query('SELECT t.stick_fp, t.subject, t.closed, t.num_replies, t.sticky, t.first_post_id, t.poll_type, t.poll_time, t.poll_term, t.poll_kol, f.id AS forum_id, f.forum_name, f.moderators, fp.post_replies, 0 AS is_subscribed FROM '.$db->prefix.'topics AS t INNER JOIN '.$db->prefix.'forums AS f ON f.id=t.forum_id LEFT JOIN '.$db->prefix.'forum_perms AS fp ON (fp.forum_id=f.id AND fp.group_id='.$pun_user['g_id'].') WHERE (fp.read_forum IS NULL OR fp.read_forum=1) AND t.id='.$id.' AND t.moved_to IS NULL') or error('Unable to fetch topic info', __FILE__, __LINE__, $db->error());
-
 $cur_topic = $db->fetch_assoc($result);
-
 if (!$cur_topic)
 	message($lang_common['Bad request'], false, '404 Not Found');
-
 // MOD subforums - Visman
 if (!isset($sf_array_asc[$cur_topic['forum_id']]))
 	message($lang_common['Bad request'], false, '404 Not Found');
-
 // MOD Кто в этой теме - Visman
 if (defined('WITT_ENABLE'))
 {
 	$now = time();
-
 	// подготовка массива посещений
 	if (empty($pun_user['witt_data']))
 	{
@@ -170,30 +137,23 @@ if (defined('WITT_ENABLE'))
 			$i++;
 		}
 		$pun_user['witt_data'] = serialize($witt_du);
-
 		unset($witt_du);
 	}
-
 	unset($witt_ar);
-
 	// Отложенное выполнение запроса обновления таблицы online
 	witt_query(array('column' => 'witt_data', 'value' => $pun_user['witt_data']));
-
 	// смотрим кто в online
 	$witt_us = array(1 => array());
 	update_users_online($id, $witt_us);
 }
 // MOD Кто в этой теме - Visman
-
 // Sort out who the moderators are and if we are currently a moderator (or an admin)
 $mods_array = $cur_topic['moderators'] != '' ? unserialize($cur_topic['moderators']) : array();
 $is_admmod = $pun_user['g_id'] == PUN_ADMIN || ($pun_user['g_moderator'] == '1' && array_key_exists($pun_user['username'], $mods_array)) ? true : false;
 if ($is_admmod)
 	$admin_ids = get_admin_ids();
-
 if ($pun_user['is_bot']) // запретим ботам постить - Visman
 	$pun_config['o_quickpost'] = $cur_topic['post_replies'] = $pun_user['g_post_replies'] = $pun_config['o_topic_views'] = '';
-
 // Can we or can we not post replies?
 if ($cur_topic['closed'] == '0')
 {
@@ -205,14 +165,10 @@ if ($cur_topic['closed'] == '0')
 else
 {
 	$post_link = $lang_topic['Topic closed'];
-
 	if ($is_admmod)
 		$post_link .= ' / <a href="post.php?tid='.$id.'">'.$lang_topic['Post reply'].'</a>';
-
 	$post_link = "\t\t\t".'<p class="postlink conr">'.$post_link.'</p>'."\n";
 }
-
-
 // Add/update this topic in our list of tracked topics
 if (!$pun_user['is_guest'])
 {
@@ -220,22 +176,14 @@ if (!$pun_user['is_guest'])
 	$tracked_topics['topics'][$id] = time();
 	set_tracked_topics($tracked_topics);
 }
-
-
 // Determine the post offset (based on $_GET['p'])
 $num_pages = ceil(($cur_topic['num_replies'] + 1) / $pun_user['disp_posts']);
-
 $p = ! is_numeric($_GET['p'] ?? null) || $_GET['p'] <= 1 || $_GET['p'] > $num_pages ? 1 : intval($_GET['p']);
 $start_from = $pun_user['disp_posts'] * ($p - 1);
-
 // Generate paging links
 $paging_links = '<span class="pages-label">'.$lang_common['Pages'].' </span>'.paginate($num_pages, $p, 'viewtopic.php?id='.$id.$url_shl); // search HL - Visman
-
-
 if ($pun_config['o_censoring'] == '1')
 	$cur_topic['subject'] = censor_words($cur_topic['subject']);
-
-
 $quickpost = false;
 if ($pun_config['o_quickpost'] == '1' &&
 	($cur_topic['post_replies'] == '1' || ($cur_topic['post_replies'] == '' && $pun_user['g_post_replies'] == '1')) &&
@@ -243,7 +191,6 @@ if ($pun_config['o_quickpost'] == '1' &&
 {
 	// Load the post.php language file
 	require PUN_ROOT.'lang/'.$pun_user['language'].'/post.php';
-
 	$required_fields = array('req_message' => $lang_common['Message']);
 	if ($pun_user['is_guest'])
 	{
@@ -253,7 +200,6 @@ if ($pun_config['o_quickpost'] == '1' &&
 	}
 	$quickpost = true;
 }
-
 if (!$pun_user['is_guest'] && $pun_config['o_topic_subscriptions'] == '1')
 {
 	if ($cur_topic['is_subscribed'])
@@ -264,11 +210,9 @@ if (!$pun_user['is_guest'] && $pun_config['o_topic_subscriptions'] == '1')
 }
 else
 	$subscraction = '';
-
 // Add relationship meta tags
 $page_head = array();
 $page_head['canonical'] = '<link rel="canonical" href="viewtopic.php?id='.$id.($p == 1 ? '' : '&amp;p='.$p).'" title="'.sprintf($lang_common['Page'], $p).'" />';
-
 if ($num_pages > 1)
 {
 	if ($p > 1)
@@ -276,12 +220,10 @@ if ($num_pages > 1)
 	if ($p < $num_pages)
 		$page_head['next'] = '<link rel="next" href="viewtopic.php?id='.$id.'&amp;p='.($p + 1).'" title="'.sprintf($lang_common['Page'], $p + 1).'" />';
 }
-
 if ($pun_config['o_feed_type'] == '1')
 	$page_head['feed'] = '<link rel="alternate" type="application/rss+xml" href="extern.php?action=feed&amp;tid='.$id.'&amp;type=rss" title="'.$lang_common['RSS topic feed'].'" />';
 else if ($pun_config['o_feed_type'] == '2')
 	$page_head['feed'] = '<link rel="alternate" type="application/atom+xml" href="extern.php?action=feed&amp;tid='.$id.'&amp;type=atom" title="'.$lang_common['Atom topic feed'].'" />';
-
 $page_title = [pun_htmlspecialchars($cur_topic['subject'])];
 $cur = $cur_topic['forum_id'];
 while (true) {
@@ -293,11 +235,9 @@ while (true) {
 }
 $page_title[] = pun_htmlspecialchars($pun_config['o_board_title']);
 $page_title = array_reverse($page_title);
-
 define('PUN_ALLOW_INDEX', 1);
 define('PUN_ACTIVE_PAGE', 'index');
 require PUN_ROOT.'header.php';
-
 ?>
 <div class="linkst">
 	<div class="inbox crumbsplus">
@@ -314,44 +254,33 @@ require PUN_ROOT.'header.php';
 		<div class="clearer"></div>
 	</div>
 </div>
-
 <?php
-
-
 require PUN_ROOT.'include/parser.php';
-
 $post_count = 0; // Keep track of post numbers
-
 // Retrieve a list of post IDs, LIMIT is (really) expensive so we only fetch the IDs here then later fetch the remaining data
 $result = $db->query('SELECT id FROM '.$db->prefix.'posts WHERE topic_id='.$id.' ORDER BY id LIMIT '.$start_from.','.$pun_user['disp_posts']) or error('Unable to fetch post IDs', __FILE__, __LINE__, $db->error());
-
 $post_ids = array();
 while ($row = $db->fetch_row($result)) {
 	$post_ids[] = $row[0];
 }
-
 if (empty($post_ids))
 	error('The post table and topic table seem to be out of sync!', __FILE__, __LINE__);
-
 // StickFP - Visman
 $stick_fp_flag = $cur_topic['stick_fp'] != 0 || $cur_topic['poll_type'] > 0;
 $stick_fp_start_from = 0;
 if ($stick_fp_flag)
 	$post_ids[] = $cur_topic['first_post_id'];
 // StickFP - Visman
-
 // MOD warnings - Visman
 $result = $db->query('SELECT id, message, poster, posted FROM '.$db->prefix.'warnings WHERE id IN ('.implode(',', $post_ids).')', true) or error('Unable to fetch warnings', __FILE__, __LINE__, $db->error());
 $warnings = array();
 while ($warning = $db->fetch_assoc($result))
 	$warnings[$warning['id']] = '<cite>'.format_time($warning['posted']).' '.pun_htmlspecialchars($warning['poster']).' '.$lang_common['wrote'].'</cite>'.parse_message($warning['message'], false).'';
 // MOD warnings - Visman
-
 // Poll MOD - Visman
 if (in_array($cur_topic['first_post_id'], $post_ids))
 	poll_display_topic($id, $pun_user['id'], $p, true);
 // Poll MOD - Visman
-
 // мод пола, добавлен u.gender ; мод ограничения времени, добавлен p.edit_post - Visman
 // add "g.g_pm, u.messages_enable," - New PMS - "u.warning_all," - Warnings - p.user_agent, - user agent - Visman
 // Retrieve the posts (and their respective poster/online status)
@@ -383,7 +312,6 @@ while ($cur_post = $db->fetch_assoc($result))
 	$post_actions = array();
 	$is_online = '';
 	$signature = '';
-
 	// If the poster is a registered user
 	if ($cur_post['poster_id'] > 1)
 	{
@@ -394,17 +322,13 @@ while ($cur_post = $db->fetch_assoc($result))
 			$cur_post['gender'] = 'female';
 		else
 			$cur_post['gender'] = NULL;
-
 		if ($pun_user['g_view_users'] == '1')
 			$username = '<a href="profile.php?id='.$cur_post['poster_id'].'">'.pun_htmlspecialchars($cur_post['username']).'</a>';
 		else
 			$username = pun_htmlspecialchars($cur_post['username']);
-
 		$user_title = get_title($cur_post);
-
 		// Format the online indicator
 		$is_online = isset($onl_u[$cur_post['poster_id']]) ? '<strong>'.$lang_topic['Online'].'</strong>' : '<span>'.$lang_topic['Offline'].'</span>';
-
 		if ($pun_config['o_avatars'] == '1' && $pun_user['show_avatars'] != '0')
 		{
 			if (isset($user_avatar_cache[$cur_post['poster_id']]))
@@ -412,7 +336,6 @@ while ($cur_post = $db->fetch_assoc($result))
 			else
 				$user_avatar = $user_avatar_cache[$cur_post['poster_id']] = generate_avatar_markup($cur_post['poster_id']);
 		}
-
 		// We only show location, register date, post count and the contact links if "Show user info" is enabled
 		if ($pun_config['o_show_user_info'] == '1')
 		{
@@ -420,26 +343,21 @@ while ($cur_post = $db->fetch_assoc($result))
 			{
 				if ($pun_config['o_censoring'] == '1')
 					$cur_post['location'] = censor_words($cur_post['location']);
-
 				$user_info[] = '<dd><span>'.$lang_topic['From'].' '.pun_htmlspecialchars($cur_post['location']).'</span></dd>';
 			}
-
 			$user_info[] = '<dd><span>'.$lang_topic['Registered'].' '.format_time($cur_post['registered'], true).'</span></dd>';
-
 			if ($pun_config['o_show_post_count'] == '1' || $pun_user['is_admmod'])
 				$user_info[] = '<dd><span>'.$lang_topic['Posts'].' '.forum_number_format($cur_post['num_posts']).'</span></dd>';
-
 			// Now let's deal with the contact links (Email and URL)
 			if ((($cur_post['email_setting'] == '0' && !$pun_user['is_guest']) || $pun_user['is_admmod']) && $pun_user['g_send_email'] == '1')
 				$user_contacts[] = '<span class="email"><a href="mailto:'.pun_htmlspecialchars($cur_post['email']).'">'.$lang_common['Email'].'</a></span>';
 			else if ($cur_post['email_setting'] == '1' && !$pun_user['is_guest'] && $pun_user['g_send_email'] == '1')
 				$user_contacts[] = '<span class="email"><a href="misc.php?email='.$cur_post['poster_id'].'">'.$lang_common['Email'].'</a></span>';
-
-			if ($cur_post['url'] != '')
+			require PUN_ROOT . 'include/pms/viewtopic_PM-link.php';
+						if ($cur_post['url'] != '')
 			{
 				if ($pun_config['o_censoring'] == '1')
 						$cur_post['url'] = censor_words($cur_post['url']);
-
 				$user_contacts[] = '<span class="website"><a href="'.pun_htmlspecialchars($cur_post['url']).'" rel="ugc">'.$lang_topic['Website'].'</a></span>';
 			}
 		}
@@ -450,20 +368,16 @@ while ($cur_post = $db->fetch_assoc($result))
 				$user_contacts[] = '<span class="pmsnew"><a href="pmsnew.php?mdl=post&amp;uid='.$cur_post['poster_id'].'">'.$lang_common['PM'].'</a></span>';
 			}
 // New PMS - Visman
-
 		if ($pun_user['g_id'] == PUN_ADMIN || ($pun_user['g_moderator'] == '1' && $pun_user['g_mod_promote_users'] == '1'))
 		{
 			if ($cur_post['g_promote_next_group'])
 				$user_info[] = '<dd><span><a href="profile.php?action=promote&amp;id='.$cur_post['poster_id'].'&amp;pid='.$cur_post['id'].'&amp;csrf_hash='.csrf_hash().'">'.$lang_topic['Promote user'].'</a></span></dd>';
 		}
-
 		if ($pun_user['is_admmod'])
 		{
 			// IP пользователей видят только админы - MOD warnings - Visman
-			$user_info[] = '<dd><span>'.$lang_topic['Warnings'].'<a href="search.php?action=show_user_warn&amp;user_id='.$cur_post['poster_id'].'">&#160;'.$cur_post['warning_all'].'&#160;</a></span></dd>';
 			if ($pun_user['g_id'] == PUN_ADMIN)
 				$user_info[] = '<dd><span><a href="moderate.php?get_host='.$cur_post['id'].'" title="'.pun_htmlspecialchars($cur_post['poster_ip']).'">'.$lang_topic['IP address logged'].'</a></span></dd>';
-
 			if ($cur_post['admin_note'] != '')
 				$user_info[] = '<dd><span>'.$lang_topic['Note'].' <strong>'.pun_htmlspecialchars($cur_post['admin_note']).'</strong></span></dd>';
 		}
@@ -478,24 +392,19 @@ while ($cur_post = $db->fetch_assoc($result))
 	{
 		$username = pun_htmlspecialchars($cur_post['username']);
 		$user_title = get_title($cur_post);
-
 		// мод пола - Visman
 		$cur_post['gender'] = NULL;
-
 		// IP пользователей видят только админы - Visman
 		if ($pun_user['g_id'] == PUN_ADMIN)
 			$user_info[] = '<dd><span><a href="moderate.php?get_host='.$cur_post['id'].'" title="'.pun_htmlspecialchars($cur_post['poster_ip']).'">'.$lang_topic['IP address logged'].'</a></span></dd>';
-
 		if ($pun_config['o_show_user_info'] == '1' && $cur_post['poster_email'] != '' && !$pun_user['is_guest'] && $pun_user['g_send_email'] == '1')
 			$user_contacts[] = '<span class="email"><a href="mailto:'.pun_htmlspecialchars($cur_post['poster_email']).'">'.$lang_common['Email'].'</a></span>';
 	}
-
 	// Generation post action array (quote, edit, delete etc.)
 	if (!$is_admmod)
 	{
 		if (!$pun_user['is_guest'])
 			$post_actions[] = '<li class="postreport"><span><a href="misc.php?report='.$cur_post['id'].'">'.$lang_topic['Report'].'</a></span></li>';
-
 		if ($cur_topic['closed'] == '0')
 		{
 			if ($cur_post['poster_id'] == $pun_user['id'] && ($pun_user['g_deledit_interval'] == 0 || $cur_post['edit_post'] == 1 || time()-$cur_post['posted'] < $pun_user['g_deledit_interval'])) // ограничение времени редактирования - Visman
@@ -505,7 +414,6 @@ while ($cur_post = $db->fetch_assoc($result))
 				if ($pun_user['g_edit_posts'] == '1')
 					$post_actions[] = '<li class="postedit"><span><a href="edit.php?id='.$cur_post['id'].'">'.$lang_topic['Edit'].'</a></span></li>';
 			}
-
 			if (($cur_topic['post_replies'] == '' && $pun_user['g_post_replies'] == '1') || $cur_topic['post_replies'] == '1')
 				$post_actions[] = '<li class="postquote"><span><a href="post.php?tid='.$id.'&amp;qid='.$cur_post['id'].'">'.$lang_topic['Reply'].'</a></span></li>';
 		}
@@ -521,10 +429,8 @@ while ($cur_post = $db->fetch_assoc($result))
 		}
 		$post_actions[] = '<li class="postquote"><span><a href="post.php?tid='.$id.'&amp;qid='.$cur_post['id'].'">'.$lang_topic['Reply'].'</a></span></li>';
 	}
-
 	// Perform the main parsing of the message (BBCode, smilies, censor words etc)
 	$cur_post['message'] = parse_message($cur_post['message'], $cur_post['hide_smilies']);
-
 	// Do signature parsing/caching
 	if ($pun_config['o_signatures'] == '1' && $cur_post['signature'] != '' && $pun_user['show_sig'] != '0')
 	{
@@ -536,7 +442,6 @@ while ($cur_post = $db->fetch_assoc($result))
 			$signature_cache[$cur_post['poster_id']] = $signature;
 		}
 	}
-
 ?>
 <div id="p<?php echo $cur_post['id'] ?>" class="blockpost<?php echo ($post_count % 2 == 0) ? ' roweven' : ' rowodd' ?><?php if ($cur_post['id'] == $cur_topic['first_post_id']) echo ' firstpost'; ?><?php if ($post_count == 1) echo ' blockpost1'; ?>">
 	<h2><span><span class="conr">#<?php echo ($start_from + $post_count) ?></span> <a href="viewtopic.php?pid=<?php echo $cur_post['id'].'#p'.$cur_post['id'] ?>"><?php echo format_time($cur_post['posted']) ?></a></span></h2>
@@ -577,11 +482,8 @@ while ($cur_post = $db->fetch_assoc($result))
 		</div>
 	</div>
 </div>
-
 <?php
-
 }
-
 ?>
 <div class="postlinksb">
 	<div class="inbox crumbsplus">
@@ -599,9 +501,7 @@ while ($cur_post = $db->fetch_assoc($result))
 		<div class="clearer"></div>
 	</div>
 </div>
-
 <?php
-
 // *****************************************************************************
 // Кто в этой теме - Visman
 if (defined('WITT_ENABLE'))
@@ -612,7 +512,6 @@ if (defined('WITT_ENABLE'))
 		<div class="inbox">
 			<dl class="conl">
 <?php
-
 	$num_guests = count($witt_us[1]);
 	$num_bots = 0;
 	$num_users = count($witt_us) - 1;
@@ -620,7 +519,6 @@ if (defined('WITT_ENABLE'))
 	$witt_bt = $witt_us[1];
 	unset($witt_us[1]);
 	unset($witt_us[1]);
-
 	foreach ($witt_us as $online_id => $online_name)
 	{
 		if ($pun_user['g_view_users'] == '1')
@@ -645,12 +543,10 @@ if (defined('WITT_ENABLE'))
 		$users[] = "\n\t\t\t\t".'<dd>[Bot] '.pun_htmlspecialchars($online_name.($online_id > 1 ? ' ('.$online_id.')' : ''));
 	}
 	echo "\t\t\t\t".'<dd><span>'.sprintf($lang_topic['Users online'], '<strong>'.forum_number_format($num_users).'</strong>').', '.sprintf($lang_topic['Guests online'], '<strong>'.forum_number_format($num_guests).'</strong>').'</span></dd>'."\n\t\t\t".'</dl>'."\n";;
-
  	if ($num_users + $num_bots > 0)
 		echo "\t\t\t".'<dl id="onlinelist" class="clearb">'.implode(',</dd> ', $users).'</dd>'."\n\t\t\t".'</dl>'."\n";
 	else
 		echo "\t\t\t".'<div class="clearer"></div>'."\n";
-
 ?>
 		</div>
 	</div>
@@ -659,13 +555,10 @@ if (defined('WITT_ENABLE'))
 }
 // Кто в этой теме - Visman
 // *****************************************************************************
-
 // Display quick post if enabled
 if ($quickpost)
 {
-
 $cur_index = 1;
-
 ?>
 <div id="quickpost" class="blockform">
 	<h2><span><?php echo $lang_topic['Quick post'] ?></span></h2>
@@ -680,25 +573,20 @@ $cur_index = 1;
 <?php if ($pun_config['o_topic_subscriptions'] == '1' && ($pun_user['auto_notify'] == '1' || $cur_topic['is_subscribed'])): ?>						<input type="hidden" name="subscribe" value="1" />
 <?php endif; ?>
 <?php
-
 if ($pun_user['is_guest'])
 {
 	$email_label = $pun_config['p_force_guest_email'] == '1' ? '<strong>'.$lang_common['Email'].' <span>'.$lang_common['Required'].'</span></strong>' : $lang_common['Email'];
 	$email_form_name = $pun_config['p_force_guest_email'] == '1' ? 'req_email' : 'email';
-
 ?>
 						<label class="conl required"><strong><?php echo $lang_post['Guest name'] ?> <span><?php echo $lang_common['Required'] ?></span></strong><br /><input type="text" name="req_username" size="25" maxlength="25" tabindex="<?php echo $cur_index++ ?>" /><br /></label>
 						<label class="conl<?php echo ($pun_config['p_force_guest_email'] == '1') ? ' required' : '' ?>"><?php echo $email_label ?><br /><input type="text" name="<?php echo $email_form_name ?>" size="50" maxlength="80" tabindex="<?php echo $cur_index++ ?>" /><br /></label>
 						<div class="clearer"></div>
 <?php
-
 	echo "\t\t\t\t\t\t".'<label class="required"><strong>'.$lang_common['Message'].' <span>'.$lang_common['Required'].'</span></strong><br />';
 }
 else
 	echo "\t\t\t\t\t\t".'<label>';
-
 ?>
-
 						<textarea class="for-emoji-autocomplete" name="req_message" rows="7" cols="75" tabindex="<?php echo $cur_index++ ?>"></textarea></label>
 						<ul class="bblinks">
 							<li><span><a href="help.php#bbcode" onclick="window.open(this.href); return false;"><?php echo $lang_common['BBCode'] ?></a> <?php echo ($pun_config['p_message_bbcode'] == '1') ? $lang_common['on'] : $lang_common['off']; ?></span></li>
@@ -714,10 +602,8 @@ else
 	$checkboxes = array();
 	if ($is_admmod && isset($pun_config['o_merge_timeout']) && $pun_config['o_merge_timeout']>0)
 		$checkboxes[] = '<label><input type="checkbox" name="merge" value="1" tabindex="'.($cur_index++).'" checked="checked" />'.$lang_post['Merge posts'].'<br /></label>';
-
 	if (!empty($checkboxes))
 	{
-
 ?>
 			<div class="inform">
 				<fieldset>
@@ -730,7 +616,6 @@ else
 				</fieldset>
 			</div>
 <?php
-
 	}
 // End Merge mod
 ?>
@@ -741,13 +626,10 @@ else
 </div>
 <?php
 require PUN_ROOT.'include/bbcode.inc.php';
-
 }
-
 // Increment "num_views" for topic
 if ($pun_config['o_topic_views'] == '1')
 	$db->query('UPDATE '.$db->prefix.'topics SET num_views=num_views+1 WHERE id='.$id) or error('Unable to update topic', __FILE__, __LINE__, $db->error());
-
 $forum_id = $cur_topic['forum_id'];
 $footer_style = 'viewtopic';
 require PUN_ROOT.'footer.php';
